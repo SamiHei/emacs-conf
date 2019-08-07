@@ -96,7 +96,7 @@
 (use-package doom-themes
   :ensure t
   :init (progn
-          (load-theme 'doom-monokai t)))
+          (load-theme 'doom-molokai t)))
 
 (use-package doom-modeline
       :ensure t
