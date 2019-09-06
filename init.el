@@ -254,3 +254,38 @@ See URL 'https://github.com/awslabs/cfn-python-lint'."
                          (add-hook 'python-mode-hook 'jedi:setup)))
   :config
   (setq jedi:complete-on-dot t))
+
+;; haskell config
+(use-package haskell-mode
+  :ensure t
+  :mode (("\\.hs\\'"    . haskell-mode)
+         ("\\.cabal\\'" . haskell-cabal-mode)
+         ("\\.hcr\\'"   . haskell-core-mode))
+  :interpreter ("haskell" . haskell-mode)
+
+  :init
+  (add-hook 'haskell-mode-hook 'structured-haskell-mode)
+  (add-hook 'haskell-mode-hook 'interactive-haskell-mode)
+  (add-hook 'haskell-mode-hook (lambda () (yas-minor-mode)))
+
+  :config
+  (require 'haskell)
+  (require 'haskell-mode)
+  (require 'haskell-interactive-mode)
+  (require 'autoinsert))
+
+;; c/cpp config
+(use-package irony
+  :ensure t
+  :config
+  (progn
+    (use-package company-irony
+      :ensure t
+      :config
+      (add-to-list 'company-backends 'company-irony))
+    (add-hook 'irony-mode-hook 'electric-pair-mode)
+    (add-hook 'c++-mode-hook 'irony-mode)
+    (add-hook 'c-mode-hook 'irony-mode)
+    (add-hook 'irony-mode-hook 'my-irony-mode-hook)
+    (add-hook 'irony-mode-hook 'company-irony-setup-begin-commands)
+    (add-hook 'irony-mode-hook 'irony-cdb-autosetup-compile-options)))
