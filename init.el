@@ -47,6 +47,10 @@
 
 (global-set-key (kbd "C-;") 'comment-or-uncomment-region-or-line)
 
+;; org mode binding
+(define-key global-map "\C-cl" 'org-store-link)
+(define-key global-map "\C-ca" 'org-agenda)
+
 ;; show matching parens
 (show-paren-mode t)
 
@@ -91,6 +95,11 @@
             (global-set-key (kbd "M-x") 'counsel-M-x)
             (global-set-key (kbd "C-x b") 'counsel-switch-buffer)
             (define-key minibuffer-local-map (kbd "C-r") 'counsel-minibuffer-history)))
+
+;; org mode
+(use-package org
+  :ensure t
+  :mode ("\\.org$" . org.mode))
 
 ;; Load color theme
 (use-package doom-themes
