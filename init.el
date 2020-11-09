@@ -69,12 +69,16 @@
 (setq package-enable-at-startup nil)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/"))
 (add-to-list 'package-archives '("melpa-stable" . "https://stable.melpa.org/packages/"))
+(add-to-list 'package-archives                                                                                                        
+             '("elpy" . "http://jorgenschaefer.github.io/packages/")) 
 
 (package-initialize)
 
+(unless package-archive-contents
+  (package-refresh-contents))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; package settings
-
 (use-package swiper
   :ensure t
   :pin melpa-stable)
@@ -105,7 +109,7 @@
 (use-package doom-themes
   :ensure t
   :init (progn
-          (load-theme 'doom-molokai t)))
+          (load-theme 'doom-Iosvkem t)))
 
 (use-package doom-modeline
       :ensure t
@@ -114,46 +118,7 @@
                 (setq doom-modeline-icon nil
                       doom-modeline-bar-width 1)))
 
-;; programming specific
-
-(require 'prettier-js)
-
-(use-package company
-  :defer t
-  :commands global-company-mode
-  :diminish company-mode
-  :init (progn
-          (add-hook 'after-init-hook 'global-company-mode)
-          (global-set-key (kbd "C-.") #'company-complete))
-  :config (progn
-            (add-to-list 'company-backends 'company-lsp)
-            (setq company-minimum-prefix-length 2
-                  company-idle-delay 0
-                  company-tooltip-idle-delay 0))
-  :pin gnu)
-
-(with-eval-after-load 'company
-    (add-hook 'emacs-lisp-mode-hook
-        '(lambda ()
-         (require 'company-elisp)
-         (push 'company-elisp company-backends))))
-
-(use-package web-mode
-  :ensure t
-  :commands web-mode
-  :mode (("\\.html$" . web-mode)
-         ("\\.ts$" . web-mode)
-         ("\\.tsx$" . web-mode)
-	 ("\\.js$" . web-mode))
-  :config (progn
-            (setq web-mode-markup-indent-offset 2)
-            (setq web-mode-css-indent-offset 2)
-            (setq web-mode-code-indent-offset 2)
-
-            (add-hook 'web-mode-hook 'electric-pair-mode)
-            (add-hook 'web-mode-hook 'electric-indent-mode))
-  :pin melpa-stable)
-
+;; Documentation and data formats
 (use-package json-mode
   :ensure t
   :mode ("\\.json$" . json-mode)
@@ -175,126 +140,172 @@
           (add-hook 'markdown-mode-hook #'outline-minor-mode))
   :pin melpa-stable)
 
-(use-package exec-path-from-shell
+;;;;;;;;;;;;;;;;;;;;;;;
+;; Programming specific
+
+;; Auto-completion
+(use-package company
   :ensure t
-  :pin melpa-stable
-  :init (progn
-          (when (memq window-system '(mac ns x))
-            (exec-path-from-shell-initialize))))
-
-(use-package flycheck
-  :after git-gutter-fringe
-  :commands flycheck-mode
-  :diminish flycheck-mode
-  :init (progn
-          (add-hook 'flycheck-mode-hook 'flycheck-rust-setup))
-  :config (setq flycheck-indication-mode 'left-fringe)
-  :pin melpa-stable)
-
-;; cloudformation-mode
-(define-derived-mode cfn-mode yaml-mode
-  "Cloudformation"
-  "Cloudformation template mode.")
-
-(add-to-list 'auto-mode-alist '(".template\\'" . cfn-mode))
-
-(with-eval-after-load 'flycheck
-  (flycheck-define-checker cfn-lint
-    "A Cloudformation linter using cfn-python-lint.
-
-See URL 'https://github.com/awslabs/cfn-python-lint'."
-    :command ("cfn-lint" "-f" "parseable" source)
-    :error-patterns (
-                     (warning line-start (file-name) ":" line ":" column
-                              ":" (one-or-more digit) ":" (one-or-more digit) ":"
-                              (id "W" (one-or-more digit)) ":" (message) line-end)
-                     (error line-start (file-name) ":" line ":" column
-                            ":" (one-or-more digit) ":" (one-or-more digit) ":"
-                            (id "E" (one-or-more digit)) ":" (message) line-end)
-                     )
-    :modes (cfn-mode)
+  :config
+  (progn
+    ;; Enable company mode in every programming mode
+    (add-hook 'prog-mode-hook 'company-mode)
+    ;; Set my own default company backends
+    (setq-default
+     company-backends
+     '(
+       company-nxml
+       company-css
+       company-cmake
+       company-files
+       company-dabbrev-code
+       company-keywords
+       company-dabbrev
+       company-elisp
+       ))
     )
-  (add-to-list 'flycheck-checkers 'cfn-lint))
+  )
 
-;; typescript and javascript
-(use-package tide
-  :after web-mode
+;; Syntax and style
+(use-package flycheck
   :ensure t
-  :commands tide-mode
-  :init (progn
-          (add-hook 'web-mode-hook 'tide-mode)
-          (flycheck-add-mode 'javascript-eslint 'web-mode))
-  :config (progn
-            (defun tide-flycheck-setup ()
-              (flycheck-mode 1)
-              (flycheck-select-checker 'javascript-eslint))
-            (defun tide-flycheck-set-default-dir ()
-              (setq default-directory
-                    (locate-dominating-file default-directory "tsconfig.json")))
-
-            (add-hook 'tide-mode-hook 'tide-flycheck-set-default-dir)
-            (add-hook 'tide-mode-hook 'tide-flycheck-setup)
-            (add-hook 'tide-mode-hook 'prettier-js-mode)
-            (add-hook 'tide-mode-hook 'tide-hl-identifier-mode)
-            
-            (setq web-mode-code-indent-offset 2
-                  web-mode-markup-indent-offset 2
-
-                  tide-always-show-documentation t
-                  tide-completion-detailed t)))
-
-;; python config
-(use-package python
-  :ensure t
-  :mode ("\\.py\\'" . python-mode)
-  :interpreter ("python" . python-mode))
-
-(use-package elpy
-  :ensure t
-  :defer t
   :init
-  (elpy-enable))
+  (progn
+    ;; Enable flycheck mode as long as we're not in TRAMP
+    (add-hook
+     'prog-mode-hook
+     (lambda () (if (not (is-current-file-tramp)) (flycheck-mode 1))))
+    )
+  )
 
-(use-package company-jedi
+;; C/C++
+(use-package rtags
   :ensure t
-  :disabled t
-  :hook (python-mode . (lambda ()
-                         (push 'company-jedi company-backends)
-                         (add-hook 'python-mode-hook 'jedi:setup)))
   :config
-  (setq jedi:complete-on-dot t))
+  (progn
+    ;; Start rtags upon entering a C/C++ file
+    (add-hook
+     'c-mode-common-hook
+     (lambda () (if (not (is-current-file-tramp))
+                    (rtags-start-process-unless-running))))
+    (add-hook
+     'c++-mode-common-hook
+     (lambda () (if (not (is-current-file-tramp))
+                    (rtags-start-process-unless-running))))
+    ;; Flycheck setup
+    (require 'flycheck-rtags)
+    (defun my-flycheck-rtags-setup ()
+      (flycheck-select-checker 'rtags)
+      ;; RTags creates more accurate overlays.
+      (setq-local flycheck-highlighting-mode nil)
+      (setq-local flycheck-check-syntax-automatically nil))
+    ;; c-mode-common-hook is also called by c++-mode
+    (add-hook 'c-mode-common-hook #'my-flycheck-rtags-setup)
+    ;; Keybindings
+    (rtags-enable-standard-keybindings c-mode-base-map "\C-cr")
+    )
+  )
 
-;; haskell config
-(use-package haskell-mode
-  :ensure t
-  :mode (("\\.hs\\'"    . haskell-mode)
-         ("\\.cabal\\'" . haskell-cabal-mode)
-         ("\\.hcr\\'"   . haskell-core-mode))
-  :interpreter ("haskell" . haskell-mode)
-
-  :init
-  (add-hook 'haskell-mode-hook 'structured-haskell-mode)
-  (add-hook 'haskell-mode-hook 'interactive-haskell-mode)
-  (add-hook 'haskell-mode-hook (lambda () (yas-minor-mode)))
-
-  :config
-  (require 'haskell)
-  (require 'haskell-mode)
-  (require 'haskell-interactive-mode)
-  (require 'autoinsert))
-
-;; c/cpp config
+;; Use irony for completion
 (use-package irony
   :ensure t
   :config
   (progn
+    (add-hook
+     'c-mode-common-hook
+     (lambda () (if (not (is-current-file-tramp)) (irony-mode))))
+    (add-hook
+     'c++-mode-common-hook
+     (lambda () (if (not (is-current-file-tramp)) (irony-mode))))
+    (add-hook 'irony-mode-hook 'irony-cdb-autosetup-compile-options)
     (use-package company-irony
       :ensure t
       :config
-      (add-to-list 'company-backends 'company-irony))
-    (add-hook 'irony-mode-hook 'electric-pair-mode)
-    (add-hook 'c++-mode-hook 'irony-mode)
-    (add-hook 'c-mode-hook 'irony-mode)
-    (add-hook 'irony-mode-hook 'my-irony-mode-hook)
-    (add-hook 'irony-mode-hook 'company-irony-setup-begin-commands)
-    (add-hook 'irony-mode-hook 'irony-cdb-autosetup-compile-options)))
+      (push 'company-irony company-backends)
+      )
+    )
+  )
+
+;; Python
+(use-package elpy :ensure t
+  :defer t
+  :init
+  (advice-add 'python-mode :before 'elpy-enable))
+
+;; Robot Framework
+(defgroup robot-mode nil
+  "Robot Framework major mode"
+  :link '(url-link "https://github.com/wingyplus/robot-mode")
+  :group 'languages)
+
+(defconst robot-mode--header-keywords-re
+  (regexp-opt '("Settings" "Test Cases" "Keywords" "Variables"))
+  "Header keywords regexp")
+
+(defconst robot-mode-header-three-star-re "\\*\\{3\\}")
+
+(defconst robot-mode-whitespace-re "[ \t]+")
+
+(defconst robot-mode-header-re
+  (concat
+    "^"
+    robot-mode-header-three-star-re robot-mode-whitespace-re
+    robot-mode--header-keywords-re
+    robot-mode-whitespace-re robot-mode-header-three-star-re))
+
+(defvar robot-mode-header
+  `(,robot-mode-header-re . font-lock-keyword-face)
+  "Header keywords")
+
+(defconst robot-mode-settings-keywords-re
+  (concat
+    "^"
+    (regexp-opt '("Library" "Resource" "Variables"
+                   "Documentation" "Metadata" "Suite Setup"
+                   "Suite Teardown" "Force Tags" "Default Tags"
+                   "Test Setup" "Test Teardown" "Test Template"
+                   "Test Timeout"))))
+
+(defvar robot-mode-settings-keywords
+  `(,robot-mode-settings-keywords-re . font-lock-keyword-face))
+
+(defconst robot-mode-test-case-settings-keywords-re
+  (regexp-opt '("Arguments" "Documentation" "Tags" "Setup"
+		"Teardown" "Template" "Timeout" "Return"))
+  "Test case settings keywords regexp")
+
+(defconst robot-mode-test-case-settings-re
+  (concat "\\[" robot-mode-test-case-settings-keywords-re "\\]"))
+
+(defvar robot-mode-test-case-settings
+  `(,robot-mode-test-case-settings-re . font-lock-keyword-face)
+  "Test case settings keyword")
+
+(defvar robot-mode-comment
+  '("^[\s\ta-zA-Z0-9]*\\(#.*\\)$" . (1 font-lock-comment-face))
+  (concat
+    "Comment"
+    "FIXME: it does not tokenizes when Test Case have embeded variable"))
+
+(defvar robot-mode-variable
+  '("[\\$&@]{.*?}" . font-lock-variable-name-face))
+
+(defvar robot-mode-font-lock-keywords
+  (list
+    robot-mode-header
+    robot-mode-settings-keywords
+    robot-mode-test-case-settings
+    robot-mode-comment
+    robot-mode-variable)
+  "All available keywords")
+
+(define-derived-mode robot-mode fundamental-mode "Robot Framework"
+  "A major mode for Robot Framework."
+  (setq-local comment-start "# ")
+  (setq-local font-lock-defaults
+    '(robot-mode-font-lock-keywords)))
+
+(add-to-list 'auto-mode-alist '("\\.robot\\'" . robot-mode))
+
+(provide 'robot-mode)
+
